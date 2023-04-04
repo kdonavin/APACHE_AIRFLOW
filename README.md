@@ -222,6 +222,87 @@ default_args={
 ```
 Or reporting may be sent within DAGs using the `EmailOperator`. Note that the Airflow server will have to be configured as an email server (not covered here).
 
+## Templates
+
+Templates allow substituting information during a DAG run. They provide added flexibility when defining tasks. Templates are written in the Jinja templating language.
+
+For an example of the efficiency of templates, consider a situation where many similar bash scripts needed to be run.
+
+```python
+t1 = BashOperator(
+	task_id='first_task'
+	, bash_command='echo "Reading file1.txt"'
+	, dag=example_dag
+	)
+t2 = BashOperator(
+	task_id='second_task'
+	, bash_command='echo "Reading file2.txt"'
+	, dag=example_dag
+	)
+```
+
+The same behavior could be accomplished instead more efficiently with templates!: 
+
+```python
+templated_command="""
+	echo "reading {{ params.filename }}"
+"""
+
+t1 = BashOperator(task_id='template_task'
+		, bash_command=templated_command
+		, params={'filename': 'file1.txt'}
+		, dag=example_dag
+	)
+t1 = BashOperator(task_id='template_task'
+		, bash_command=templated_command
+		, params={'filename': 'file2.txt'}
+		, dag=example_dag
+	)
+```
+
+Note that separate task objects per file may make more sense than a list of files (_see_ Jinja templating below) in order to pass specific params, or to allow parallel processing if it is available.
+
+### Jinja Templating
+
+Using Jinja templating codes can be even more powerful. For instance, a list of file names being read can be printed to the console with the following:
+
+```python
+templated_command="""
+{% for filename in params.filenames %}
+	echo "Reading {{ filename }}..."
+{% endfor %}
+"""
+
+#Note use of a list for params.filenames
+t1 = BashOperator(
+		task_id='template_task'
+		, bash_command=templated_command
+		, params={'filenames': ['file1.txt', 'file2.txt']}
+		, dag=example_dag
+	)
+```
+
+### Built-in Template Variables
+
+Here are some useful variables that are built into Airflow for use in templates:
+
+- `{{ ds }}`: the execution date, `YYYY-MM-DD`
+- `{{ ds_nodash }}`: the execution date without dashes, `YYYYMMDD`
+- `{{ prev_ds }}`: the previous execution date, `YYYY-MM-DD` 
+- `{{ prev_ds_nodash }}`: the previous execution date without dashes, `YYYYMMDD`
+- `{{ dag }}`: DAG object name
+- `{{ conf }}`: Airflow config object
+
+
+### Built-in Template Macros
+
+In addition to built in variables, Airflow can use built-in macros to access useful Python tools:
+
+- `{{ macros.datetime }}`: Access the `datetime.datetime` object
+- `{{ macros.timedelta }}`: Access the `datetime.timedelta` object
+- `{{ macros.uuid }}`: Access the `uuid` object (universal unique identifier)
+- `{{ macros.ds_add(YYYY-MM-DD, x) }}`: A quick method for doing date math, adding `x` days to `YYYY-MM-DD`.
+
 ## Acknowledgements
 
 - These notes were written primarily while working through DataCamp's [Introduction to Airflow in Python](https://campus.datacamp.com/courses/introduction-to-airflow-in-python/) course with Mike Metzger, Data Engineer.
