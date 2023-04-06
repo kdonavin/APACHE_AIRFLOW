@@ -156,6 +156,30 @@ Sometimes DAG tasks will be held up in the executer as there are not enough free
 - Adding system resources, or more systems
 - Changing the DAG scheduling to something more efficient
 
+### Branch Operators
+
+Branching in Airflow provides conditional logic for running operators. A `BranchPythonOperator` example:
+
+```python
+def branch_test(**kwargs):
+	if int(kwargs['ds_nodash']) % 2 == 0:
+		return 'even_day_task'
+	else:
+		return 'odd_day_task'
+
+branch_test = BranchPythonOperator(
+	task_id='branch_test'
+	, dag=dag
+	, provide_context=True #Provide access to runtime variables and macros, referenced in kwargs above
+	, python_callable=branch_test)
+
+#...task code omitted...
+
+#dependencies
+start_task >> branch_task >> even_day_task >> even_day_task2
+branch_task >> odd_day_task >> odd_day_task2 #Note lack of need to re-define start_task dependency
+```
+
 ## Scheduling
 
 DAGs can be run manually, or automatically via `schedule_interval`. Each instance of a workflow that is run maintains a state `running`, `failed`, or `success`. Individual `task` instances may have these states as well, or others like `queued` or `skipped`.
