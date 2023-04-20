@@ -7,9 +7,11 @@ A platform to program workflows, including creation, scheduling, monitoring such
 All following the `airflow` shell command:
 
 - `airflow list_dags`: lists DAGs part of the airflow system
-- `airflow run <dag_id> <task_id> YYYY-MM-DD`: Run `task_id` from the DAG `dag_id`, with a start date (earliest date the dag can be run).
+- `airflow run <dag_id> <task_id> YYYY-MM-DD`: Run a specific task, `task_id` from the DAG `dag_id`, with a start date (earliest date the dag can be run).
 - `airflow scheduler`: Restart the scheduler, which can stop for various reasons preventing new tasks from being scheduled.
 - `airflow webserver`: start a webserver. Use `-p` to specify port.
+- `airflow test <dag_id> <task_id> YYYY-MM-DD`: Test a specific task, `task_id` from the DAG `dag_id`, with a start date (`-1`)
+- `airflow trigger_dag -e <date> <dag_id>:` Run a full DAG, as though it were running on date `<date>`.
 
 The command-line is best used to interact with Airflow to start processes, manually run DAGs or tasks within them, and get logging information. Python is best used to edit the DAGs themselves.s
 
@@ -76,6 +78,7 @@ email_task = EmailOperator(
 	, files=['latest_sales.xlsx']
 	, dag=example_dag)
 ```
+- `DummyOperator(<task_id>, <dag_id>)`: An non-operator operator. Can be useful in conditional logic where a log of something not occuring is useful. E.g., when an email is not sent out on weekends: `no_email_task = DummyOperator(task_id='no_email_task', dag=dag)`
 
 ### Tasks
 
@@ -163,9 +166,9 @@ Branching in Airflow provides conditional logic for running operators. A `Branch
 ```python
 def branch_test(**kwargs):
 	if int(kwargs['ds_nodash']) % 2 == 0:
-		return 'even_day_task'
+		return 'even_day_task' #Note this is a task_id
 	else:
-		return 'odd_day_task'
+		return 'odd_day_task' #Note this is a task_id
 
 branch_test = BranchPythonOperator(
 	task_id='branch_test'
@@ -173,11 +176,13 @@ branch_test = BranchPythonOperator(
 	, provide_context=True #Provide access to runtime variables and macros, referenced in kwargs above
 	, python_callable=branch_test)
 
-#...task code omitted...
+even_day_op = DummyOperator(task_id='even_day_task', dag=dag)
+odd_day_op = DummyOperator(task_id='odd_day_task', dag=dag)
 
 #dependencies
-start_task >> branch_task >> even_day_task >> even_day_task2
-branch_task >> odd_day_task >> odd_day_task2 #Note lack of need to re-define start_task dependency
+start_task >> branch_task >> even_day_op
+branch_task >> odd_day_op #Note lack of need to re-define start_task dependency
+#start_task >> branch_task >> [even_day_op, odd_day_op] #Another cleaner dependency definition
 ```
 
 ## Scheduling
